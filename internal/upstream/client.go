@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"lobsterai2api/internal/auth"
@@ -41,6 +42,12 @@ type apiEnvelope struct {
 type Client struct {
 	HTTP     *http.Client
 	LastBody []byte // 最近一次非 2xx 响应体，供调用方 Classify
+	// UpdateURL 客户端版本解析接口（签到用）；空值用官方默认地址。
+	UpdateURL string
+
+	verMu       sync.Mutex
+	verResolved string
+	verAt       time.Time
 }
 
 // New 生产默认值。配置连接池减少 TLS 握手。
@@ -223,8 +230,8 @@ func (c *Client) ChatStream(a *auth.Auth, body []byte) (rc io.ReadCloser, status
 
 // FetchModels 调上游动态模型接口。
 // GET {server}/api/models/available，Bearer accessToken。
-// 返回模型 ID 列表；失败返回错误（调用方回退静态表）。
-func (c *Client) FetchModels(a *auth.Auth) ([]string, error) {
+// 返回 modelMeta 列表；失败返回错误（调用方回退静态表）。
+func (c *Client) FetchModels(a *auth.Auth) ([]ModelMeta, error) {
 	url := ServerBase() + "/api/models/available"
 	body := a.KeyfromBody()
 	// build query string from keyfrom
@@ -254,10 +261,13 @@ func (c *Client) FetchModels(a *auth.Auth) ([]string, error) {
 	var env struct {
 		Code int `json:"code"`
 		Data []struct {
-			ModelID   string `json:"modelId"`
-			ModelName string `json:"modelName"`
-			Provider  string `json:"provider"`
-			ApiFormat string `json:"apiFormat"`
+			ModelID      string   `json:"modelId"`
+			ModelName    string   `json:"modelName"`
+			Provider     string   `json:"provider"`
+			ApiFormat    string   `json:"apiFormat"`
+			ContextWindow int64   `json:"contextWindow"`
+			CostMultiplier float64 `json:"costMultiplier"`
+			Description  string   `json:"description"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &env); err != nil {
@@ -266,14 +276,36 @@ func (c *Client) FetchModels(a *auth.Auth) ([]string, error) {
 	if env.Code != 0 {
 		return nil, fmt.Errorf("models api code=%d", env.Code)
 	}
-	ids := make([]string, 0, len(env.Data))
+	out := make([]ModelMeta, 0, len(env.Data))
 	for _, m := range env.Data {
-		if m.ModelID != "" {
-			ids = append(ids, m.ModelID)
+		if m.ModelID == "" {
+			continue
 		}
+		out = append(out, ModelMeta{
+			ID:            m.ModelID,
+			Name:          m.ModelName,
+			Provider:      m.Provider,
+			ApiFormat:     m.ApiFormat,
+			ContextWindow: m.ContextWindow,
+			CostMultiplier: m.CostMultiplier,
+			Description:   m.Description,
+		})
 	}
-	if len(ids) == 0 {
+	if len(out) == 0 {
 		return nil, fmt.Errorf("models api returned empty list")
+	}
+	return out, nil
+}
+
+// FetchModelIDs 调上游动态模型接口，仅返回 ID 列表；等价于 FetchModels + 仅保留 ID。
+func (c *Client) FetchModelIDs(a *auth.Auth) ([]string, error) {
+	metas, err := c.FetchModels(a)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(metas))
+	for _, m := range metas {
+		ids = append(ids, m.ID)
 	}
 	return ids, nil
 }
@@ -295,7 +327,7 @@ func (c *Client) QuotaUsage(a *auth.Auth) (remain int64, total int64, err error)
 		return 0, 0, err
 	}
 	var ps struct {
-		TotalCreditsRemaining float64 `json:"totalCreditsRemaining"`
+		TotalCreditsRemaining *float64 `json:"totalCreditsRemaining"`
 	}
 	if err := json.Unmarshal(data, &ps); err != nil {
 		return 0, 0, fmt.Errorf("profile-summary parse: %w", err)
@@ -306,16 +338,8 @@ func (c *Client) QuotaUsage(a *auth.Auth) (remain int64, total int64, err error)
 		}
 		return int64(v)
 	}
-	if ps.TotalCreditsRemaining > 0 {
-		return clamp(ps.TotalCreditsRemaining), 0, nil
+	if ps.TotalCreditsRemaining != nil {
+		return clamp(*ps.TotalCreditsRemaining), 0, nil
 	}
 	return 0, 0, fmt.Errorf("profile-summary: no credits")
-}
-
-// DailyCheckin 执行每日签到。目前龙虾签到端点未知，返回 nil（no-op）。
-// 后续抓包确定端点后再实现。
-func (c *Client) DailyCheckin(a *auth.Auth) error {
-	// TODO: LobsterAI daily sign-in endpoint TBD
-	// placeholder: return nil means "checkin skipped silently"
-	return nil
 }

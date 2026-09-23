@@ -3,6 +3,8 @@
   "api_key": "",
   "auth_dir": "./auths",
   "state_file": "./data/state.json",
+  "checkin_file": "./data/checkin.json",
+  "schedule_file": "./data/schedule.json",
   "cooldown": {
     "hard_credit": "12h",
     "soft_rate": "60s",
@@ -11,10 +13,12 @@
   },
   "schedule": {
     "checkin_hours": [9, 21],
-    "keepalive_hours": [22]
+    "keepalive_hours": [22],
+    "credit_refresh_interval": "30m"
   },
   "upstream": {
     "timeout_seconds": 180,
-    "base_url": ""
+    "base_url": "",
+    "update_url": ""
   }
 }

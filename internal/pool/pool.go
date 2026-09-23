@@ -222,6 +222,31 @@ func (p *Pool) NoteSuccess(uid string) {
 	}
 }
 
+// Enable 取消禁用并清空冷却、错误计数；管理员手动启用入口。
+func (p *Pool) Enable(uid string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if e, ok := p.byUID[uid]; ok {
+		e.disabled = false
+		e.until = time.Time{}
+		e.reason = ""
+		e.errCount = 0
+	}
+	p.saveLocked()
+}
+
+// ForceCooldown 手动加入冷却到 now+d（reason 写入用于 tooltip）。
+func (p *Pool) ForceCooldown(uid, reason string, d time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if e, ok := p.byUID[uid]; ok {
+		e.until = time.Now().Add(d)
+		e.reason = reason
+		e.errCount = 0
+	}
+	p.saveLocked()
+}
+
 // AuthByUID 返回账号的完整凭证（给调度器/运维接口用）。
 func (p *Pool) AuthByUID(uid string) *auth.Auth {
 	p.mu.RLock()

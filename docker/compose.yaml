@@ -1,0 +1,58 @@
+name: lobsterai2api
+
+services:
+  lobsterai2api:
+    image: ${LB2A_IMAGE:-lobsterai2api:local}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    user: "0:0"
+    restart: unless-stopped
+    stop_grace_period: 10s
+    ports:
+      - target: 8367
+        published: "${LB2A_PORT:-8367}"
+        host_ip: ${LB2A_BIND_ADDRESS:-0.0.0.0}
+        protocol: tcp
+    environment:
+      LB2A_UPSTREAM_BASE: ${LB2A_UPSTREAM_BASE:?请在 docker/.env 中填写 LB2A_UPSTREAM_BASE}
+      LB2A_API_KEY: ${LB2A_API_KEY:-}
+      LB2A_LISTEN: :8367
+      LB2A_AUTH_DIR: /app/auths
+      LB2A_STATE_FILE: /app/data/state.json
+      LB2A_CHECKIN_FILE: /app/data/checkin.json
+      LB2A_SCHEDULE_FILE: /app/data/schedule.json
+      # 签到/保活整点小时（逗号分隔 0-23，- 表示关闭）。
+      LB2A_CHECKIN_HOURS: ${LB2A_CHECKIN_HOURS:-9,21}
+      LB2A_KEEPALIVE_HOURS: ${LB2A_KEEPALIVE_HOURS:-22}
+      # 账号额度刷新间隔（30m、2h、1h30m，0 或 - 表示关闭）。
+      LB2A_CREDIT_REFRESH_INTERVAL: ${LB2A_CREDIT_REFRESH_INTERVAL:-30m}
+      # 客户端版本解析接口（签到用）；空值使用官方默认地址。
+      LB2A_UPDATE_URL: ${LB2A_UPDATE_URL:-}
+      LB2A_TIMEOUT_SECONDS: ${LB2A_TIMEOUT_SECONDS:-180}
+      LB2A_HARD_CREDIT: ${LB2A_HARD_CREDIT:-12h}
+      LB2A_SOFT_RATE: ${LB2A_SOFT_RATE:-60s}
+      LB2A_ERR_THRESHOLD: ${LB2A_ERR_THRESHOLD:-3}
+      LB2A_ERR_COOLDOWN: ${LB2A_ERR_COOLDOWN:-10m}
+      # 管理页 OAuth 登录：门户地址为空时管理页仍可打开，登录接口提示配置缺失。
+      LB2A_LOGIN_PORTAL: ${LB2A_LOGIN_PORTAL:-}
+      # 授权地址里的 127.0.0.1 回调端口取宿主机端口，登录后浏览器才能落到本服务的提示页。
+      LB2A_CALLBACK_PORT: ${LB2A_PORT:-8367}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - auths:/app/auths
+      - data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  auths:
+  data:

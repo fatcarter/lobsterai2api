@@ -4,6 +4,7 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,7 +16,7 @@ import (
 type Auth struct {
 	AccessToken   string
 	RefreshToken  string
-	ExpiresAt     int64 // Unix 秒
+	ExpiresAt     int64  // Unix 秒
 	UID           string // 用户唯一 ID
 	UserId        string // 有道 yid
 	Nickname      string
@@ -126,7 +127,7 @@ func Parse(raw []byte) (*Auth, error) {
 }
 
 // SaveAtomic 以嵌套形原子写回 FilePath（tmp + rename），保持登录工具可读格式。
-func (a *Auth) SaveAtomic() error {
+func (a *Auth) SaveAtomic() (resultErr error) {
 	if a.FilePath == "" {
 		return fmt.Errorf("no FilePath set")
 	}
@@ -149,11 +150,22 @@ func (a *Auth) SaveAtomic() error {
 	if err != nil {
 		return err
 	}
-	tmp := a.FilePath + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+	// 网页登录与后台刷新可能同时落盘；独立临时文件避免相互截断，失败时清理凭证残片。
+	tmp, err := os.CreateTemp(filepath.Dir(a.FilePath), ".lobsterai-auth-*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, a.FilePath)
+	defer func() {
+		if err := os.Remove(tmp.Name()); err != nil && !os.IsNotExist(err) {
+			resultErr = errors.Join(resultErr, err)
+		}
+	}()
+	_, writeErr := tmp.Write(raw)
+	closeErr := tmp.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), a.FilePath)
 }
 
 // LoadDir 扫描 dir 下 lobsterai-*.json，解析失败的文件静默跳过。
