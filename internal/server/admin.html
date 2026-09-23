@@ -819,6 +819,13 @@ textarea { resize: vertical; min-height: 4.5rem; font-family: ui-monospace, SFMo
               <div id="modelsRefreshed" class="card-meta"></div>
             </div>
             <div class="btn-row">
+              <label class="cooldown-field">排序
+                <select id="modelsSort" onchange="renderModels()">
+                  <option value="default">默认</option>
+                  <option value="cost-desc">消耗倍率 ↓</option>
+                  <option value="cost-asc">消耗倍率 ↑</option>
+                </select>
+              </label>
               <button class="btn secondary sm" type="button" onclick="loadModels(true)">刷新</button>
             </div>
           </div>
@@ -1183,6 +1190,20 @@ function modelBadgeHTML(m) {
   }
   return parts.join("");
 }
+// modelsCache 保留上游返回的原始顺序；切换排序时只重排展示，不重新请求。
+let modelsCache = { items: [], lastRefreshed: 0 };
+function modelCost(m) {
+  // 缺省或非正数视为 1 倍（与徽标「仅在不等于 1 时显示」的口径一致）。
+  const c = m.cost_multiplier;
+  return typeof c === "number" && c > 0 ? c : 1;
+}
+function sortedModels() {
+  const items = modelsCache.items.slice();
+  const mode = $("modelsSort") ? $("modelsSort").value : "default";
+  if (mode === "cost-desc") items.sort(function(a, b) { return modelCost(b) - modelCost(a); });
+  else if (mode === "cost-asc") items.sort(function(a, b) { return modelCost(a) - modelCost(b); });
+  return items;
+}
 async function loadModels(forceRefresh) {
   const g = $("modelsList");
   const refreshedEl = $("modelsRefreshed");
@@ -1193,19 +1214,23 @@ async function loadModels(forceRefresh) {
   try {
     if (forceRefresh) {
       const r = await request("/admin/api/models/refresh", { method: "POST" });
-      renderModels(r.items || [], r.last_refreshed || 0);
-      showToast("已刷新，共 " + (r.count || (r.items || []).length) + " 个模型");
+      modelsCache = { items: r.items || [], lastRefreshed: r.last_refreshed || 0 };
+      renderModels();
+      showToast("已刷新，共 " + (r.count || modelsCache.items.length) + " 个模型");
       return;
     }
     const d = await request("/admin/api/models");
-    renderModels(d.items || [], d.last_refreshed || 0);
+    modelsCache = { items: d.items || [], lastRefreshed: d.last_refreshed || 0 };
+    renderModels();
   } catch (err) {
     g.innerHTML = '<p class="hint" style="margin:0;color:var(--danger)">' + esc(err.message) + "</p>";
     msgEl.textContent = err.message;
     msgEl.style.color = "var(--danger)";
   }
 }
-function renderModels(items, lastRefreshed) {
+function renderModels() {
+  const items = sortedModels();
+  const lastRefreshed = modelsCache.lastRefreshed;
   const g = $("modelsList");
   const refreshedEl = $("modelsRefreshed");
   g.innerHTML = "";
