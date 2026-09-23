@@ -709,8 +709,11 @@ func TestBalanceReturnsUpstreamUSD(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("解析响应失败: %v", err)
 	}
-	if resp.Balance != 12.345678 {
-		t.Fatalf("余额不正确: %v", resp.Balance)
+	if resp.TotalGranted != 12.345678 || resp.TotalUsed != 0 || resp.TotalAvailable != 12.345678 {
+		t.Fatalf("额度不正确: %+v", resp)
+	}
+	if resp.Object != "credit_summary" {
+		t.Fatalf("object 不正确: %q", resp.Object)
 	}
 }
 
@@ -741,8 +744,8 @@ func TestBalanceFallsBackToCachedCredits(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("解析响应失败: %v", err)
 	}
-	if resp.Balance != 5000 {
-		t.Fatalf("回退余额不正确: %v", resp.Balance)
+	if resp.TotalAvailable != 5000 || resp.TotalGranted != 5000 || resp.TotalUsed != 0 {
+		t.Fatalf("回退额度不正确: %+v", resp)
 	}
 }
 

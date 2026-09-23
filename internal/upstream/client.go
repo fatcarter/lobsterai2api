@@ -338,30 +338,40 @@ func (c *Client) QuotaUsage(a *auth.Auth) (remain int64, total int64, err error)
 	return 0, 0, fmt.Errorf("profile-summary: no credits")
 }
 
-// USDBalance 查询账号当前余额，单位 USD。
-// GET {server}/api/v1/auth/me 的 balance；字段缺失视为 0。
-func (c *Client) USDBalance(a *auth.Auth) (float64, error) {
+// CreditSummary 账户额度汇总，单位 USD。
+// Granted 累计发放、Used 累计已用、Available 当前可用。
+type CreditSummary struct {
+	Granted   float64
+	Used      float64
+	Available float64
+}
+
+// USDBalance 查询账号额度汇总，单位 USD。
+// GET {server}/api/v1/auth/me 的 balance 作为当前可用额度；上游不提供累计发放与已用，
+// 因此 Granted 取可用额度、Used 为 0。balance 缺失或为负视为 0。
+func (c *Client) USDBalance(a *auth.Auth) (CreditSummary, error) {
 	req, err := http.NewRequest(http.MethodGet, ServerBase()+"/api/v1/auth/me", nil)
 	if err != nil {
-		return 0, err
+		return CreditSummary{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+a.AccessToken)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", clientUA)
 	data, err := c.doJSON(req)
 	if err != nil {
-		return 0, err
+		return CreditSummary{}, err
 	}
 	var me struct {
 		Balance *float64 `json:"balance"`
 	}
 	if err := json.Unmarshal(data, &me); err != nil {
-		return 0, fmt.Errorf("auth/me parse: %w", err)
+		return CreditSummary{}, fmt.Errorf("auth/me parse: %w", err)
 	}
-	if me.Balance == nil || *me.Balance < 0 {
-		return 0, nil
+	available := 0.0
+	if me.Balance != nil && *me.Balance > 0 {
+		available = *me.Balance
 	}
-	return *me.Balance, nil
+	return CreditSummary{Granted: available, Available: available}, nil
 }
 
 // clampCredits 把上游返回的积分截断为非负整数；负值按 0 处理。

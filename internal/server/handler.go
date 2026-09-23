@@ -160,12 +160,26 @@ func (h *Handler) models(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// balanceResponse 账户余额查询响应，单位 USD。
+// balanceResponse 账户额度汇总，单位 USD。
 type balanceResponse struct {
-	Balance float64 `json:"balance"` // 当前账户余额，单位 USD
+	Object         string  `json:"object"`          // 固定为 credit_summary
+	TotalGranted   float64 `json:"total_granted"`   // 累计发放额度
+	TotalUsed      float64 `json:"total_used"`      // 累计已用额度
+	TotalAvailable float64 `json:"total_available"` // 当前可用额度
 }
 
-// balance 查询账户余额：挑一个可用账号调上游 GET /api/v1/auth/me，原样返回 USD 余额。
+// creditSummaryOf 把上游额度汇总转成对外响应。
+func creditSummaryOf(s upstream.CreditSummary) balanceResponse {
+	return balanceResponse{
+		Object:         "credit_summary",
+		TotalGranted:   s.Granted,
+		TotalUsed:      s.Used,
+		TotalAvailable: s.Available,
+	}
+}
+
+// balance 查询账户额度：挑一个可用账号调上游 GET /api/v1/auth/me。
+// 上游只给当前余额，因此累计发放取该余额、已用为 0。
 // 上游不可达时回退到账号池缓存积分（按 1 积分 = 1 USD），保证接口在上游抖动时仍可返回数值。
 func (h *Handler) balance(w http.ResponseWriter, r *http.Request) {
 	if h.cfg.Pool == nil {
@@ -178,12 +192,13 @@ func (h *Handler) balance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.cfg.Upstream != nil {
-		if v, err := h.cfg.Upstream.USDBalance(acct); err == nil {
-			writeJSON(w, http.StatusOK, balanceResponse{Balance: v})
+		if s, err := h.cfg.Upstream.USDBalance(acct); err == nil {
+			writeJSON(w, http.StatusOK, creditSummaryOf(s))
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, balanceResponse{Balance: float64(h.cfg.Pool.CreditsOf(acct.UID))})
+	cached := float64(h.cfg.Pool.CreditsOf(acct.UID))
+	writeJSON(w, http.StatusOK, creditSummaryOf(upstream.CreditSummary{Granted: cached, Available: cached}))
 }
 
 // modelList 同 models，但供内部其它 handler 复用（如 adminModels）。

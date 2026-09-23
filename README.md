@@ -196,6 +196,7 @@ curl -s http://127.0.0.1:8367/v1/models -H "Authorization: Bearer ***"
 
 # account balance (USD)
 curl -s http://127.0.0.1:8367/api/v1/auth/me -H "Authorization: Bearer ***"
+# {"object":"credit_summary","total_granted":100,"total_used":0,"total_available":100}
 
 # status
 curl -s http://127.0.0.1:8367/status
