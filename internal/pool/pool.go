@@ -150,6 +150,16 @@ func (p *Pool) PickExcluding(tried map[string]bool) *auth.Auth {
 	return best.a
 }
 
+// CreditsOf 返回账号缓存的剩余积分；账号不存在返回 0。
+func (p *Pool) CreditsOf(uid string) int64 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if e, ok := p.byUID[uid]; ok {
+		return e.credits
+	}
+	return 0
+}
+
 // SetCredits 更新账号余额。
 func (p *Pool) SetCredits(uid string, credits int64) {
 	p.mu.Lock()

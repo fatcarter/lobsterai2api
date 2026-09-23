@@ -73,6 +73,7 @@ func NewHandler(cfg Config) *Handler {
 	h := &Handler{cfg: cfg, mux: http.NewServeMux()}
 	h.mux.HandleFunc("POST /v1/chat/completions", h.withAuth(h.chatCompletions))
 	h.mux.HandleFunc("GET /v1/models", h.withAuth(h.models))
+	h.mux.HandleFunc("GET /api/v1/auth/me", h.withAuth(h.balance))
 	h.mux.HandleFunc("GET /status", h.status)
 	h.mux.HandleFunc("GET /healthz", h.healthz)
 	// 管理页与管理接口共用 /v1 的 API 密钥；页面本身不含密钥，由浏览器输入后逐次携带。
@@ -157,6 +158,32 @@ func (h *Handler) models(w http.ResponseWriter, r *http.Request) {
 		"object": "list",
 		"data":   toModelEntries(ids),
 	})
+}
+
+// balanceResponse 账户余额查询响应，单位 USD。
+type balanceResponse struct {
+	Balance float64 `json:"balance"` // 当前账户余额，单位 USD
+}
+
+// balance 查询账户余额：挑一个可用账号调上游 GET /api/v1/auth/me，原样返回 USD 余额。
+// 上游不可达时回退到账号池缓存积分（按 1 积分 = 1 USD），保证接口在上游抖动时仍可返回数值。
+func (h *Handler) balance(w http.ResponseWriter, r *http.Request) {
+	if h.cfg.Pool == nil {
+		writeOpenAIError(w, http.StatusServiceUnavailable, "no_healthy_account", "账号池未初始化")
+		return
+	}
+	acct := h.cfg.Pool.Pick()
+	if acct == nil {
+		writeOpenAIError(w, http.StatusServiceUnavailable, "no_healthy_account", "没有可用账号")
+		return
+	}
+	if h.cfg.Upstream != nil {
+		if v, err := h.cfg.Upstream.USDBalance(acct); err == nil {
+			writeJSON(w, http.StatusOK, balanceResponse{Balance: v})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, balanceResponse{Balance: float64(h.cfg.Pool.CreditsOf(acct.UID))})
 }
 
 // modelList 同 models，但供内部其它 handler 复用（如 adminModels）。

@@ -194,6 +194,9 @@ curl -s http://127.0.0.1:8367/v1/chat/completions \
 # model list
 curl -s http://127.0.0.1:8367/v1/models -H "Authorization: Bearer ***"
 
+# account balance (USD)
+curl -s http://127.0.0.1:8367/api/v1/auth/me -H "Authorization: Bearer ***"
+
 # status
 curl -s http://127.0.0.1:8367/status
 ```

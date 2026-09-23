@@ -261,13 +261,13 @@ func (c *Client) FetchModels(a *auth.Auth) ([]ModelMeta, error) {
 	var env struct {
 		Code int `json:"code"`
 		Data []struct {
-			ModelID      string   `json:"modelId"`
-			ModelName    string   `json:"modelName"`
-			Provider     string   `json:"provider"`
-			ApiFormat    string   `json:"apiFormat"`
-			ContextWindow int64   `json:"contextWindow"`
+			ModelID        string  `json:"modelId"`
+			ModelName      string  `json:"modelName"`
+			Provider       string  `json:"provider"`
+			ApiFormat      string  `json:"apiFormat"`
+			ContextWindow  int64   `json:"contextWindow"`
 			CostMultiplier float64 `json:"costMultiplier"`
-			Description  string   `json:"description"`
+			Description    string  `json:"description"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &env); err != nil {
@@ -282,13 +282,13 @@ func (c *Client) FetchModels(a *auth.Auth) ([]ModelMeta, error) {
 			continue
 		}
 		out = append(out, ModelMeta{
-			ID:            m.ModelID,
-			Name:          m.ModelName,
-			Provider:      m.Provider,
-			ApiFormat:     m.ApiFormat,
-			ContextWindow: m.ContextWindow,
+			ID:             m.ModelID,
+			Name:           m.ModelName,
+			Provider:       m.Provider,
+			ApiFormat:      m.ApiFormat,
+			ContextWindow:  m.ContextWindow,
 			CostMultiplier: m.CostMultiplier,
-			Description:   m.Description,
+			Description:    m.Description,
 		})
 	}
 	if len(out) == 0 {
@@ -332,14 +332,42 @@ func (c *Client) QuotaUsage(a *auth.Auth) (remain int64, total int64, err error)
 	if err := json.Unmarshal(data, &ps); err != nil {
 		return 0, 0, fmt.Errorf("profile-summary parse: %w", err)
 	}
-	clamp := func(v float64) int64 {
-		if v < 0 {
-			return 0
-		}
-		return int64(v)
-	}
 	if ps.TotalCreditsRemaining != nil {
-		return clamp(*ps.TotalCreditsRemaining), 0, nil
+		return clampCredits(*ps.TotalCreditsRemaining), 0, nil
 	}
 	return 0, 0, fmt.Errorf("profile-summary: no credits")
+}
+
+// USDBalance 查询账号当前余额，单位 USD。
+// GET {server}/api/v1/auth/me 的 balance；字段缺失视为 0。
+func (c *Client) USDBalance(a *auth.Auth) (float64, error) {
+	req, err := http.NewRequest(http.MethodGet, ServerBase()+"/api/v1/auth/me", nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+a.AccessToken)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", clientUA)
+	data, err := c.doJSON(req)
+	if err != nil {
+		return 0, err
+	}
+	var me struct {
+		Balance *float64 `json:"balance"`
+	}
+	if err := json.Unmarshal(data, &me); err != nil {
+		return 0, fmt.Errorf("auth/me parse: %w", err)
+	}
+	if me.Balance == nil || *me.Balance < 0 {
+		return 0, nil
+	}
+	return *me.Balance, nil
+}
+
+// clampCredits 把上游返回的积分截断为非负整数；负值按 0 处理。
+func clampCredits(v float64) int64 {
+	if v < 0 {
+		return 0
+	}
+	return int64(v)
 }

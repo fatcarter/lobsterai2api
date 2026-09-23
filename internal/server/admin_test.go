@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -560,8 +561,8 @@ func TestAdminAccountsManageEnableDisableCooldown(t *testing.T) {
 		t.Fatalf("启用失败：HTTP %d %s", rec.Code, rec.Body.String())
 	}
 	var resp struct {
-		Applied int          `json:"applied"`
-		Skipped int          `json:"skipped"`
+		Applied  int           `json:"applied"`
+		Skipped  int           `json:"skipped"`
 		Accounts []pool.Status `json:"accounts"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
@@ -673,5 +674,85 @@ func TestAdminAccountsManageAppliesToAllWhenUIDsEmpty(t *testing.T) {
 	}
 	if resp.Applied != 3 {
 		t.Fatalf("空 uids 应作用于全部 3 个账号，实际 %d", resp.Applied)
+	}
+}
+
+// fakeBalanceUpstream 起一个实现 GET /api/v1/auth/me 的假上游，返回给定 USD 余额。
+func fakeBalanceUpstream(t *testing.T, balance float64) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/auth/me" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"code":0,"data":{"balance":%g}}`, balance)
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("LB2A_UPSTREAM_BASE", srv.URL)
+}
+
+func TestBalanceReturnsUpstreamUSD(t *testing.T) {
+	fakeBalanceUpstream(t, 12.345678)
+	p := pool.New("")
+	p.Add(&auth.Auth{UID: "u1", AccessToken: "tok-1"})
+	h := NewHandler(Config{Pool: p, Upstream: upstream.New(), APIKey: "sk"})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer sk")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("查询余额失败：HTTP %d %s", rec.Code, rec.Body.String())
+	}
+	var resp balanceResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析响应失败: %v", err)
+	}
+	if resp.Balance != 12.345678 {
+		t.Fatalf("余额不正确: %v", resp.Balance)
+	}
+}
+
+func TestBalanceRequiresAPIKey(t *testing.T) {
+	h := NewHandler(Config{Pool: pool.New(""), Upstream: upstream.New(), APIKey: "sk"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("未鉴权应返回 401，实际 HTTP %d", rec.Code)
+	}
+}
+
+func TestBalanceFallsBackToCachedCredits(t *testing.T) {
+	t.Setenv("LB2A_UPSTREAM_BASE", "http://127.0.0.1:1") // 不可达，触发回退
+	p := pool.New("")
+	p.Add(&auth.Auth{UID: "u1", AccessToken: "tok-1"})
+	p.SetCredits("u1", 5000)
+	h := NewHandler(Config{Pool: p, Upstream: upstream.New(), APIKey: "sk"})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer sk")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("上游不可达应回退缓存：HTTP %d %s", rec.Code, rec.Body.String())
+	}
+	var resp balanceResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析响应失败: %v", err)
+	}
+	if resp.Balance != 5000 {
+		t.Fatalf("回退余额不正确: %v", resp.Balance)
+	}
+}
+
+func TestBalanceNoHealthyAccount(t *testing.T) {
+	h := NewHandler(Config{Pool: pool.New(""), Upstream: upstream.New(), APIKey: "sk"})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer sk")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("无可用账号应返回 503，实际 HTTP %d", rec.Code)
 	}
 }
