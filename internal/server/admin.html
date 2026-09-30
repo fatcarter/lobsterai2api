@@ -45,7 +45,25 @@ try {
   --btn-fg: #FFFFFF;
   --btn-bg-hover: #3B3734;
   --nav-glass: rgba(255,255,255,0.92);
-  --login-glow: #F1F0ED;
+  /* login scene */
+  --login-bg-1: #05060A;
+  --login-bg-2: #0B0E1F;
+  --login-bg-3: #1A0B2E;
+  --login-grid: rgba(120, 160, 255, 0.08);
+  --login-grid-hot: rgba(180, 140, 255, 0.22);
+  --login-edge: rgba(255, 255, 255, 0.10);
+  --login-edge-hot: rgba(160, 200, 255, 0.55);
+  --login-cyan: #67E8F9;
+  --login-magenta: #F0ABFC;
+  --login-amber: #FBBF24;
+  --login-text: #E8EBF5;
+  --login-muted: #8A93B0;
+  --login-dim: #5A6178;
+  --login-key: #B8C5E8;
+  --login-glass: rgba(12, 14, 26, 0.55);
+  --login-shadow-1: rgba(0, 0, 0, 0.55);
+  --login-shadow-2: rgba(120, 80, 255, 0.18);
+  --login-scan: rgba(120, 200, 255, 0.06);
   --placeholder: #A8A29E;
   --radius: 14px;
   --radius-sm: 10px;
@@ -86,7 +104,24 @@ try {
   --btn-fg: #1C1917;
   --btn-bg-hover: #FBFAF8;
   --nav-glass: rgba(27,26,24,0.92);
-  --login-glow: #1F1D1B;
+  --login-bg-1: #04050A;
+  --login-bg-2: #08091A;
+  --login-bg-3: #150A2A;
+  --login-grid: rgba(140, 180, 255, 0.10);
+  --login-grid-hot: rgba(200, 160, 255, 0.28);
+  --login-edge: rgba(255, 255, 255, 0.08);
+  --login-edge-hot: rgba(180, 220, 255, 0.65);
+  --login-cyan: #67E8F9;
+  --login-magenta: #F0ABFC;
+  --login-amber: #FBBF24;
+  --login-text: #ECEEF8;
+  --login-muted: #99A0BA;
+  --login-dim: #5A6178;
+  --login-key: #B8C5E8;
+  --login-glass: rgba(10, 12, 22, 0.62);
+  --login-shadow-1: rgba(0, 0, 0, 0.65);
+  --login-shadow-2: rgba(120, 80, 255, 0.22);
+  --login-scan: rgba(120, 200, 255, 0.07);
   --placeholder: #6E6A64;
   --shadow: 0 1px 2px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 12px -2px rgba(0,0,0,0.4);
@@ -113,118 +148,442 @@ code, .mono, .num {
 .hidden { display: none !important; }
 ::selection { background: var(--accent-border); color: var(--text); }
 
-/* ---------- Login modal ---------- */
+/* ---------- Login modal — "潜入控制台" ---------- */
 .login-overlay {
   position: fixed;
   inset: 0;
+  overflow: hidden;
   background:
-    radial-gradient(900px 460px at 50% -8%, var(--login-glow) 0%, transparent 65%),
-    var(--modal-overlay);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+    radial-gradient(1200px 800px at 50% 110%, var(--login-bg-3) 0%, transparent 60%),
+    radial-gradient(900px 600px at 10% -10%, rgba(80, 120, 255, 0.18) 0%, transparent 55%),
+    radial-gradient(900px 600px at 90% -10%, rgba(200, 80, 220, 0.16) 0%, transparent 55%),
+    linear-gradient(180deg, var(--login-bg-1) 0%, var(--login-bg-2) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
   z-index: 200;
-  animation: fade-in 0.18s ease-out;
+  animation: fade-in 0.22s ease-out;
 }
-/* 卡片浮起光晕由多层 box-shadow 实现，避免使用伪元素 + border 形成可见的"虚影"边框 */
+/* 全屏网格：横竖线 + 远处热点光斑 */
+.login-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  background-image:
+    linear-gradient(var(--login-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--login-grid) 1px, transparent 1px);
+  background-size: 56px 56px, 56px 56px;
+  background-position: -1px -1px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 50%, #000 40%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 50%, #000 40%, transparent 95%);
+  pointer-events: none;
+  animation: grid-drift 24s linear infinite;
+}
+.login-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(2px 2px at 12% 22%, var(--login-grid-hot) 0%, transparent 50%),
+    radial-gradient(2px 2px at 78% 18%, var(--login-grid-hot) 0%, transparent 50%),
+    radial-gradient(2px 2px at 35% 78%, var(--login-grid-hot) 0%, transparent 50%),
+    radial-gradient(2px 2px at 88% 65%, var(--login-grid-hot) 0%, transparent 50%),
+    radial-gradient(2px 2px at 60% 88%, var(--login-grid-hot) 0%, transparent 50%);
+  pointer-events: none;
+  filter: blur(0.4px);
+  animation: stars-twinkle 5s ease-in-out infinite alternate;
+}
+@keyframes grid-drift {
+  from { background-position: -1px -1px, -1px -1px; }
+  to   { background-position: -1px 55px, 55px -1px; }
+}
+@keyframes stars-twinkle {
+  from { opacity: 0.45; }
+  to   { opacity: 1; }
+}
+
+/* 终端卡片：双层高光边框 + 玻璃感 + 顶部 1px scanline */
 .login-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 42px 38px 32px;
-  width: 100%;
-  max-width: 380px;
   position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 38px 34px 30px;
+  border-radius: 16px;
+  background: var(--login-glass);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  color: var(--login-text);
+  font-family: inherit;
   isolation: isolate;
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.6),
-    0 10px 30px -12px rgba(28,25,23,0.12),
-    0 24px 60px -20px rgba(28,25,23,0.18);
-  animation: rise-in 0.22s cubic-bezier(.2,.7,.2,1);
+    0 0 0 1px var(--login-edge) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.18) inset,
+    0 -1px 0 0 rgba(0, 0, 0, 0.35) inset,
+    0 30px 80px -20px var(--login-shadow-1),
+    0 0 60px -10px var(--login-shadow-2);
+  animation: rise-in 0.34s cubic-bezier(.16,.84,.24,1);
+  overflow: hidden;
 }
-[data-theme="dark"] .login-card {
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.04),
-    0 10px 30px -12px rgba(0,0,0,0.4),
-    0 24px 60px -20px rgba(0,0,0,0.6);
+/* 卡片顶部扫描光：扫过一次的细高光线 */
+.login-card::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--login-cyan) 35%,
+    var(--login-magenta) 65%,
+    transparent 100%);
+  opacity: 0.85;
+  filter: drop-shadow(0 0 6px var(--login-cyan));
+}
+/* 卡片内 CRT 扫描线 + 噪点 */
+.login-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg,
+      transparent 0px,
+      transparent 3px,
+      var(--login-scan) 3px,
+      var(--login-scan) 4px);
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+}
+
+/* 头部：状态点 + 终端标题 + 标题旁版本号 */
+.login-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "SF Mono", "Fira Code", "Roboto Mono", Consolas, monospace;
+  font-size: 11px;
+  color: var(--login-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 22px;
+}
+.login-head-l, .login-head-r { display: flex; align-items: center; gap: 8px; }
+.login-head-r { color: var(--login-dim); }
+.login-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--login-cyan);
+  box-shadow: 0 0 8px var(--login-cyan), 0 0 16px var(--login-cyan);
+  animation: dot-pulse 1.8s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.85); }
+}
+
+/* Logo + 标题块 */
+.login-mark-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 .login-mark {
-  width: 46px; height: 46px;
-  background: var(--mark-bg);
-  border-radius: 13px;
+  position: relative;
+  width: 52px; height: 52px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, #1A1F3A 0%, #0A0E22 100%);
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 18px;
-  color: var(--mark-fg);
-  font-family: Georgia, "Songti SC", serif;
-  font-size: 22px;
+  color: var(--login-text);
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
+  box-shadow:
+    0 0 0 1px var(--login-edge-hot) inset,
+    0 0 24px -4px var(--login-cyan),
+    0 8px 24px -8px rgba(0, 0, 0, 0.6);
 }
+/* 龙虾钳：L 字符右上角的小角标 */
+.login-mark::after {
+  content: "";
+  position: absolute;
+  top: -3px; right: -3px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--login-magenta), var(--login-amber));
+  box-shadow: 0 0 10px var(--login-magenta);
+}
+.login-titles { display: flex; flex-direction: column; gap: 4px; }
 .login-title {
-  text-align: center;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 650;
   letter-spacing: -0.015em;
+  color: var(--login-text);
+  display: flex; align-items: baseline; gap: 8px;
 }
+.login-title .cursor {
+  display: inline-block;
+  width: 7px; height: 14px;
+  background: var(--login-cyan);
+  box-shadow: 0 0 6px var(--login-cyan);
+  animation: blink 1.05s steps(2) infinite;
+  transform: translateY(1px);
+}
+@keyframes blink { 50% { opacity: 0; } }
 .login-subtitle {
-  text-align: center;
-  font-size: 13px;
-  color: var(--muted);
-  margin: 6px 0 26px;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--login-muted);
+  letter-spacing: 0.02em;
+}
+.login-subtitle .prompt { color: var(--login-cyan); }
+.login-subtitle .path   { color: var(--login-key); }
+
+/* input 容器：左前缀 $ + 输入 + 右"眼睛/状态" */
+.login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 18px;
+  padding: 0 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--login-edge);
+  border-radius: 10px;
+  height: 46px;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+}
+.login-input-wrap::before {
+  content: "$";
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  color: var(--login-cyan);
+  font-size: 15px;
+  margin-right: 10px;
+  text-shadow: 0 0 8px var(--login-cyan);
+  user-select: none;
 }
 .login-input {
-  width: 100%;
-  padding: 11px 14px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-family: inherit;
-  background: var(--surface);
-  color: var(--text);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.login-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-.login-btn {
-  width: 100%;
-  padding: 11px;
-  background: var(--btn-bg);
-  color: var(--btn-fg);
+  flex: 1;
+  background: transparent;
   border: none;
-  border-radius: var(--radius-sm);
+  outline: none;
+  color: var(--login-text);
+  font-family: "SF Mono", "Fira Code", "Roboto Mono", Consolas, monospace;
   font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 14px;
-  font-family: inherit;
-  transition: background 0.15s, transform 0.1s;
+  letter-spacing: 0.02em;
+  caret-color: var(--login-cyan);
+  height: 100%;
+  min-width: 0;
 }
-.login-btn:hover { background: var(--btn-bg-hover); }
+.login-input::placeholder {
+  color: var(--login-dim);
+  letter-spacing: 0.04em;
+}
+.login-input-wrap:focus-within {
+  border-color: var(--login-edge-hot);
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 0 0 3px rgba(103, 232, 249, 0.12),
+    0 0 24px -4px var(--login-cyan);
+}
+.login-input-status {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--login-dim);
+  margin-left: 10px;
+  transition: background 0.18s, box-shadow 0.18s;
+  flex-shrink: 0;
+}
+.login-input-wrap:focus-within .login-input-status {
+  background: var(--login-cyan);
+  box-shadow: 0 0 8px var(--login-cyan);
+}
+.login-input-wrap.error {
+  border-color: #F87171;
+  animation: shake 0.32s cubic-bezier(.36,.07,.19,.97);
+}
+.login-input-wrap.error .login-input-status {
+  background: #F87171;
+  box-shadow: 0 0 8px #F87171;
+}
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+
+/* 主按钮：箭头 + 文本 + 背景粒子流 + shine */
+.login-btn {
+  position: relative;
+  width: 100%;
+  margin-top: 16px;
+  height: 46px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(103, 232, 249, 0.10) 0%, rgba(103, 232, 249, 0.02) 100%),
+    linear-gradient(135deg, #1A2050 0%, #0A0E2A 100%);
+  color: var(--login-text);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow:
+    0 0 0 1px var(--login-edge-hot) inset,
+    0 0 24px -6px var(--login-cyan),
+    0 6px 20px -8px rgba(0, 0, 0, 0.6);
+  transition: transform 0.12s ease, box-shadow 0.18s ease, background 0.18s;
+}
+.login-btn .arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  color: var(--login-cyan);
+  text-shadow: 0 0 8px var(--login-cyan);
+}
+.login-btn:hover { background:
+    linear-gradient(180deg, rgba(103, 232, 249, 0.18) 0%, rgba(103, 232, 249, 0.04) 100%),
+    linear-gradient(135deg, #222866 0%, #0C1138 100%); }
+.login-btn:hover .arrow { transform: translateX(4px); }
 .login-btn:active { transform: translateY(1px); }
-.login-btn[disabled] { opacity: .55; cursor: not-allowed; }
+/* 一次性 shine 滑过 */
+.login-btn::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -120%;
+  width: 60%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%);
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+.login-btn:hover::before { left: 130%; }
+/* 状态点：未操作 / 加载中 / 完成 */
+.login-btn .state-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--login-cyan);
+  box-shadow: 0 0 6px var(--login-cyan);
+  animation: dot-pulse 1.4s ease-in-out infinite;
+}
+.login-btn[disabled] { cursor: not-allowed; opacity: 0.85; }
+.login-btn[disabled] .state-dot { animation-duration: 0.7s; }
+.login-btn.success {
+  background:
+    linear-gradient(180deg, rgba(74, 222, 128, 0.20) 0%, rgba(74, 222, 128, 0.05) 100%),
+    linear-gradient(135deg, #14532D 0%, #052E1A 100%);
+  box-shadow:
+    0 0 0 1px rgba(74, 222, 128, 0.55) inset,
+    0 0 24px -4px #4ADE80;
+}
+.login-btn.success .state-dot { background: #4ADE80; box-shadow: 0 0 8px #4ADE80; }
+.login-btn.success .arrow { color: #4ADE80; text-shadow: 0 0 8px #4ADE80; }
+
+/* error / hint 行 */
 .login-error {
-  color: var(--danger);
-  font-size: 13px;
-  text-align: center;
   margin-top: 12px;
   min-height: 18px;
-}
-.login-hint {
-  text-align: center;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
   font-size: 12px;
-  color: var(--muted);
-  margin-top: 14px;
+  color: #FCA5A5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.2s, transform 0.2s;
 }
+.login-error::before {
+  content: "!";
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.18);
+  color: #FCA5A5;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.login-error.show { opacity: 1; transform: translateY(0); }
+
+.login-hint {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--login-edge);
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 11px;
+  color: var(--login-dim);
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+.login-hint .k {
+  color: var(--login-amber);
+  background: rgba(251, 191, 36, 0.10);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10.5px;
+}
+
+/* 卡片底部装饰行：三个等距小灯 + 系统指纹 */
+.login-foot {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--login-dim);
+  letter-spacing: 0.08em;
+}
+.login-foot-dots { display: flex; gap: 5px; }
+.login-foot-dots span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--login-edge);
+}
+.login-foot-dots span:nth-child(1) { background: var(--login-cyan); box-shadow: 0 0 4px var(--login-cyan); }
+.login-foot-dots span:nth-child(2) { background: var(--login-magenta); box-shadow: 0 0 4px var(--login-magenta); }
+.login-foot-dots span:nth-child(3) { background: var(--login-amber); box-shadow: 0 0 4px var(--login-amber); }
+
+/* 整张卡成功 / 失败时的高级出场 */
+.login-card.success-out {
+  animation: card-flash 0.5s ease-out forwards;
+}
+.login-card.fail-out {
+  animation: card-shake-out 0.5s ease-out forwards;
+}
+@keyframes card-flash {
+  0%   { box-shadow: 0 0 0 1px var(--login-edge) inset, 0 30px 80px -20px var(--login-shadow-1); opacity: 1; transform: scale(1); }
+  20%  { box-shadow: 0 0 0 2px #4ADE80 inset, 0 0 80px -10px #4ADE80; opacity: 1; transform: scale(1.015); }
+  100% { box-shadow: 0 0 0 2px #4ADE80 inset, 0 0 80px -10px #4ADE80; opacity: 0; transform: scale(0.96) translateY(-12px); }
+}
+@keyframes card-shake-out {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-6px); }
+  40%  { transform: translateX(6px); }
+  60%  { transform: translateX(-4px); }
+  80%  { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+
+/* 通用 keyframes（之前已有 fade-in / rise-in） */
 @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
 @keyframes rise-in {
-  from { opacity: 0; transform: translateY(8px) scale(.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(14px) scale(0.97); filter: blur(8px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 /* ---------- Shell ---------- */
@@ -672,13 +1031,43 @@ textarea { resize: vertical; min-height: 4.5rem; font-family: ui-monospace, SFMo
 <!-- Login modal -->
 <div id="loginOverlay" class="login-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
   <div class="login-card">
-    <div class="login-mark">L</div>
-    <div class="login-title" id="loginTitle">LobsterAI 管理控制台</div>
-    <div class="login-subtitle">请输入 API Key 以解锁管理面板</div>
-    <input type="password" id="loginKey" class="login-input" placeholder="sk-..." autocomplete="current-password" spellcheck="false" autofocus>
-    <button class="login-btn" type="button" id="loginBtn">解锁</button>
+    <div class="login-head">
+      <div class="login-head-l">
+        <span class="login-dot"></span>
+        <span>SECURE&nbsp;CHANNEL</span>
+      </div>
+      <div class="login-head-r">LB2A&nbsp;//&nbsp;v1.0</div>
+    </div>
+
+    <div class="login-mark-row">
+      <div class="login-mark">L</div>
+      <div class="login-titles">
+        <div class="login-title" id="loginTitle">LobsterAI <span class="cursor"></span></div>
+        <div class="login-subtitle"><span class="prompt">guest@console</span>:<span class="path">~/unlock</span>$ authenticate</div>
+      </div>
+    </div>
+
+    <div class="login-input-wrap" id="loginInputWrap">
+      <input type="password" id="loginKey" class="login-input" placeholder="sk-..." autocomplete="current-password" spellcheck="false" autofocus>
+      <span class="login-input-status"></span>
+    </div>
+
+    <button class="login-btn" type="button" id="loginBtn">
+      <span class="state-dot"></span>
+      <span class="btn-text">UNLOCK&nbsp;CONSOLE</span>
+      <span class="arrow">→</span>
+    </button>
+
     <div id="loginError" class="login-error"></div>
-    <p class="login-hint">与服务 <code>LB2A_API_KEY</code> 保持一致；未开启鉴权时任意输入均可通过</p>
+
+    <div class="login-foot">
+      <div class="login-foot-dots"><span></span><span></span><span></span></div>
+      <div>AUTH&nbsp;·&nbsp;TLS&nbsp;1.3</div>
+    </div>
+
+    <p class="login-hint">
+      与服务 <span class="k">LB2A_API_KEY</span> 保持一致；未开启鉴权时任意输入均可通过。
+    </p>
   </div>
 </div>
 
@@ -1015,6 +1404,16 @@ function showLogin() {
   $("loginOverlay").classList.remove("hidden");
   $("dashboard").classList.add("hidden");
   $("loginError").textContent = "";
+  $("loginError").classList.remove("show");
+  var wrap = $("loginInputWrap"); if (wrap) wrap.classList.remove("error");
+  var card = $("loginCardReset"); // noop guard
+  var cardEl = document.querySelector(".login-card");
+  if (cardEl) { cardEl.classList.remove("success-out", "fail-out"); }
+  var btn = $("loginBtn");
+  btn.disabled = false;
+  btn.classList.remove("success");
+  btn.querySelector(".btn-text").textContent = "UNLOCK CONSOLE";
+  $("loginKey").value = "";
   setTimeout(function(){ $("loginKey").focus(); }, 50);
 }
 function showDashboard() {
@@ -1026,18 +1425,51 @@ function showDashboard() {
 }
 function tryUnlock() {
   var key = $("loginKey").value.trim();
-  if (!key) { $("loginError").textContent = "请输入 API Key"; return; }
+  var errEl = $("loginError");
+  var wrap = $("loginInputWrap");
+  var btn = $("loginBtn");
+  if (!key) {
+    errEl.textContent = "请输入 API Key";
+    errEl.classList.add("show");
+    if (wrap) { wrap.classList.remove("error"); void wrap.offsetWidth; wrap.classList.add("error"); }
+    return;
+  }
   sessionStorage.setItem(KEY_STORAGE, key);
+  // 进入"授权中"状态：按钮禁用、文案变更
+  btn.disabled = true;
+  btn.querySelector(".btn-text").textContent = "AUTHENTICATING";
+  errEl.classList.remove("show");
   // 验证 key：用其请求一次 /admin/api/accounts，成功即进入。
   request("/admin/api/accounts", { method: "GET" })
     .then(function() {
       $("loginError").textContent = "";
       $("loginKey").value = "";
-      showDashboard();
+      // 成功动效：按钮变绿 + 卡片"飞走"
+      btn.classList.add("success");
+      btn.querySelector(".btn-text").textContent = "ACCESS GRANTED";
+      var cardEl = document.querySelector(".login-card");
+      if (cardEl) {
+        cardEl.classList.add("success-out");
+        setTimeout(showDashboard, 480);
+      } else {
+        showDashboard();
+      }
     })
     .catch(function(err) {
       sessionStorage.removeItem(KEY_STORAGE);
       $("loginError").textContent = err.message || "验证失败";
+      errEl.classList.add("show");
+      btn.disabled = false;
+      btn.classList.remove("success");
+      btn.querySelector(".btn-text").textContent = "RETRY";
+      // 输入框 + 卡片抖动
+      if (wrap) { wrap.classList.remove("error"); void wrap.offsetWidth; wrap.classList.add("error"); }
+      var cardEl = document.querySelector(".login-card");
+      if (cardEl) {
+        cardEl.classList.remove("fail-out");
+        void cardEl.offsetWidth;
+        cardEl.classList.add("fail-out");
+      }
     });
 }
 function doLogout() {
