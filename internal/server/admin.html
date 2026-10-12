@@ -342,27 +342,85 @@ code, .mono, .num {
 .login-subtitle .prompt { color: var(--login-cyan); }
 .login-subtitle .path   { color: var(--login-key); }
 
-/* input 容器：左前缀 $ + 输入 + 右"眼睛/状态" */
+/* input 容器：嵌在卡里的"全息输入槽"——左 cyan 渐变竖条 + 中 label + 输入 + 右字符计数 */
 .login-input-wrap {
   position: relative;
   display: flex;
-  align-items: center;
-  margin-top: 18px;
-  padding: 0 14px;
-  background: rgba(0, 0, 0, 0.35);
+  align-items: stretch;
+  margin-top: 20px;
+  height: 52px;
+  border-radius: 12px;
+  background:
+    radial-gradient(120% 180% at 50% 0%, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.45) 100%);
   border: 1px solid var(--login-edge);
-  border-radius: 10px;
-  height: 46px;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.10) inset,
+    0 -1px 0 0 rgba(0, 0, 0, 0.5) inset,
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 8px 22px -8px rgba(0, 0, 0, 0.6);
   transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+  overflow: visible;
 }
+/* 上下 1px 渐变高光线，呼应卡片顶部扫描光 */
 .login-input-wrap::before {
-  content: "$";
+  content: "";
+  position: absolute;
+  left: 14px; right: 14px; top: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--login-cyan) 30%,
+    var(--login-magenta) 70%,
+    transparent 100%);
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+.login-input-wrap::after {
+  content: "";
+  position: absolute;
+  left: 14px; right: 14px; bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--login-cyan) 30%,
+    var(--login-magenta) 70%,
+    transparent 100%);
+  opacity: 0.25;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+/* 左侧 cyan 渐变竖条：电源灯感 */
+.login-input-bar {
+  width: 3px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    var(--login-cyan) 50%,
+    transparent 100%);
+  box-shadow: 0 0 6px var(--login-cyan), 0 0 14px var(--login-cyan);
+  align-self: stretch;
+}
+/* 左侧 label 区：跟主体有分割线 */
+.login-input-label {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
   font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
   color: var(--login-cyan);
-  font-size: 15px;
-  margin-right: 10px;
-  text-shadow: 0 0 8px var(--login-cyan);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-right: 1px solid var(--login-edge);
+  text-shadow: 0 0 6px rgba(103, 232, 249, 0.6);
+  white-space: nowrap;
   user-select: none;
+}
+.login-input-label .arrow {
+  margin-right: 6px;
+  color: var(--login-cyan);
+  animation: blink 1.2s steps(2) infinite;
 }
 .login-input {
   flex: 1;
@@ -372,41 +430,99 @@ code, .mono, .num {
   color: var(--login-text);
   font-family: "SF Mono", "Fira Code", "Roboto Mono", Consolas, monospace;
   font-size: 14px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   caret-color: var(--login-cyan);
-  height: 100%;
+  padding: 0 14px;
   min-width: 0;
+  height: 100%;
+}
+/* 压住 Chrome / Safari 密码自动填充的浅蓝/浅黄背景，否则会把全息输入槽刷成浏览器默认色 */
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus,
+.login-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.55) inset !important;
+  -webkit-text-fill-color: var(--login-text) !important;
+  caret-color: var(--login-cyan) !important;
+  transition: background-color 9999s ease-in-out 0s;
 }
 .login-input::placeholder {
   color: var(--login-dim);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
 }
-.login-input-wrap:focus-within {
-  border-color: var(--login-edge-hot);
-  background: rgba(0, 0, 0, 0.5);
-  box-shadow:
-    0 0 0 3px rgba(103, 232, 249, 0.12),
-    0 0 24px -4px var(--login-cyan);
+/* 右侧字符计数 + 状态灯 */
+.login-input-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px 0 12px;
+  border-left: 1px dashed var(--login-edge);
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--login-dim);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  user-select: none;
 }
 .login-input-status {
-  width: 8px; height: 8px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   background: var(--login-dim);
-  margin-left: 10px;
   transition: background 0.18s, box-shadow 0.18s;
   flex-shrink: 0;
 }
+/* 底部刻度尺：6 个等距小点，中间一个 cyan 强调 */
+.login-input-ticks {
+  position: absolute;
+  left: 18px; right: 18px; bottom: -7px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.18s;
+}
+.login-input-ticks span {
+  width: 2px; height: 2px;
+  background: var(--login-muted);
+  border-radius: 50%;
+}
+.login-input-ticks span:nth-child(3) {
+  background: var(--login-cyan);
+  box-shadow: 0 0 4px var(--login-cyan);
+}
+
+.login-input-wrap:focus-within {
+  border-color: var(--login-edge-hot);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.35) 100%);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.14) inset,
+    0 -1px 0 0 rgba(0, 0, 0, 0.5) inset,
+    0 0 0 3px rgba(103, 232, 249, 0.14),
+    0 0 26px -4px var(--login-cyan);
+}
+.login-input-wrap:focus-within::before { opacity: 0.95; }
+.login-input-wrap:focus-within::after  { opacity: 0.65; }
+.login-input-wrap:focus-within .login-input-ticks { opacity: 0.9; }
 .login-input-wrap:focus-within .login-input-status {
   background: var(--login-cyan);
   box-shadow: 0 0 8px var(--login-cyan);
 }
+.login-input-wrap:focus-within .login-input-meta { color: var(--login-muted); }
+
 .login-input-wrap.error {
   border-color: #F87171;
   animation: shake 0.32s cubic-bezier(.36,.07,.19,.97);
 }
+.login-input-wrap.error::before { background: linear-gradient(90deg, transparent 0%, #F87171 50%, transparent 100%); opacity: 0.8; }
 .login-input-wrap.error .login-input-status {
   background: #F87171;
   box-shadow: 0 0 8px #F87171;
+}
+.login-input-wrap.error .login-input-ticks span:nth-child(3) {
+  background: #F87171;
+  box-shadow: 0 0 4px #F87171;
 }
 @keyframes shake {
   10%, 90% { transform: translateX(-1px); }
@@ -1058,8 +1174,14 @@ textarea { resize: vertical; min-height: 4.5rem; font-family: ui-monospace, SFMo
     </div>
 
     <div class="login-input-wrap" id="loginInputWrap">
+      <div class="login-input-bar"></div>
+      <div class="login-input-label"><span class="arrow">▸</span>API&nbsp;KEY</div>
       <input type="password" id="loginKey" class="login-input" placeholder="sk-..." autocomplete="current-password" spellcheck="false" autofocus>
-      <span class="login-input-status"></span>
+      <div class="login-input-meta">
+        <span class="login-input-count" id="loginKeyCount">0</span>
+        <span class="login-input-status"></span>
+      </div>
+      <div class="login-input-ticks"><span></span><span></span><span></span><span></span><span></span><span></span></div>
     </div>
 
     <button class="login-btn" type="button" id="loginBtn">
@@ -1493,6 +1615,15 @@ $("loginBtn").addEventListener("click", tryUnlock);
 $("loginKey").addEventListener("keydown", function(e) {
   if (e.key === "Enter") tryUnlock();
 });
+// 实时同步字符计数到右侧 meta 区
+(function() {
+  var input = $("loginKey");
+  var count = $("loginKeyCount");
+  if (!input || !count) return;
+  function sync() { count.textContent = String(input.value.length).padStart(2, "0"); }
+  input.addEventListener("input", sync);
+  sync();
+})();
 
 /* ---------- API helper ---------- */
 async function request(path, options) {
