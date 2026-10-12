@@ -222,6 +222,13 @@ func (h *Handler) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.Unmarshal(body, &peek)
 
+	// 模型支持的思考等级取自 available 接口的快照（models.Store，随模型列表一起刷新）；
+	// 空表示上游未提供对应等级、无法指定思考等级，转发时移除 reasoning_effort。
+	effort := ""
+	if h.cfg.Models != nil {
+		effort = h.cfg.Models.ReasoningEffort(peek.Model)
+	}
+
 	tried := map[string]bool{}
 	var lastErr error
 	for i := 0; i < h.cfg.MaxRotate; i++ {
@@ -246,7 +253,7 @@ func (h *Handler) chatCompletions(w http.ResponseWriter, r *http.Request) {
 			_ = acct.SaveAtomic()
 		}
 
-		rc, status, terr := h.cfg.Upstream.ChatStream(acct, body)
+		rc, status, terr := h.cfg.Upstream.ChatStream(acct, body, effort)
 		if terr != nil {
 			lastErr = terr
 			h.cfg.Pool.NoteError(acct.UID, h.cfg.ErrThreshold, h.cfg.ErrCooldown)

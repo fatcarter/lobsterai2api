@@ -909,6 +909,16 @@ textarea { resize: vertical; min-height: 4.5rem; font-family: ui-monospace, SFMo
   color: var(--accent);
   border: 1px solid var(--accent-border);
 }
+.badge.effort {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0F766E;
+  border: 1px solid rgba(13, 148, 136, 0.4);
+}
+[data-theme="dark"] .badge.effort {
+  background: rgba(45, 212, 191, 0.16);
+  color: #5EEAD4;
+  border-color: rgba(45, 212, 191, 0.42);
+}
 
 /* ---------- Pagination ---------- */
 .pager {
@@ -1608,6 +1618,14 @@ function modelBadgeHTML(m) {
     // 消耗倍率图标：🌉 桥（>1 时上游更贵，<1 时上游更便宜）。
     const icon = m.cost_multiplier > 1 ? "🌉" : "🎁";
     parts.push('<span class="badge bridge" title="bridge 消耗倍率">' + icon + " ×" + m.cost_multiplier + '</span>');
+  }
+  if (m.reasoning_effort) {
+    // 正在使用的思考等级：上游 available 接口给该模型的最高等级（openclawLevel），
+    // 转发时把客户端的 reasoning_effort 替换成它。
+    parts.push('<span class="badge effort" title="转发时 reasoning_effort 替换为 ' + esc(m.reasoning_effort) + '">思考 ' + esc(m.reasoning_effort) + '</span>');
+  } else {
+    // 上游没给思考等级：该模型无法指定，转发时移除 reasoning_effort（模型元数据未刷新时也会走到这里）。
+    parts.push('<span class="badge neutral" title="上游未提供思考等级，转发时移除 reasoning_effort">思考 未指定</span>');
   }
   return parts.join("");
 }

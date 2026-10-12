@@ -94,6 +94,19 @@ func (s *Store) Items() []upstream.ModelMeta {
 	return append([]upstream.ModelMeta(nil), s.items...)
 }
 
+// ReasoningEffort 返回指定模型支持的思考等级（转发时写入 reasoning_effort）。
+// 模型不在列表中或上游未提供思考等级时返回空字符串，表示无法指定思考等级。
+func (s *Store) ReasoningEffort(id string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, m := range s.items {
+		if m.ID == id {
+			return m.ReasoningEffort
+		}
+	}
+	return ""
+}
+
 // LastRefreshed 返回最后一次成功刷新的时间；零值表示尚未刷新。
 func (s *Store) LastRefreshed() time.Time {
 	s.mu.RLock()

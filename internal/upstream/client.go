@@ -173,8 +173,13 @@ func jwtExpiry(token string) int64 {
 }
 
 // prepareChatBody 预处理请求体：force stream=true（上游只支持流式，实测 stream:false 返回 500），
-// 标准化 tool_choice。
-func prepareChatBody(rawBody []byte) []byte {
+// 标准化 tool_choice，并按模型支持的思考等级改写 reasoning_effort。
+//
+// effort 为模型支持的思考等级（available 接口 thinkingConfig.options 最后一项的 openclawLevel）：
+// 非空时把客户端传的 reasoning_effort 替换成该值（上游只认自家等级名 off/high/xhigh），
+// 为空表示上游没给对应值、该模型无法指定思考等级，此时移除 reasoning_effort 字段。
+// 客户端未传 reasoning_effort 时不主动添加。
+func prepareChatBody(rawBody []byte, effort string) []byte {
 	var body map[string]any
 	if err := json.Unmarshal(rawBody, &body); err != nil {
 		return rawBody // 解析失败原样发送
@@ -194,6 +199,14 @@ func prepareChatBody(rawBody []byte) []byte {
 			delete(body, "tool_choice")
 		}
 	}
+	// reasoning_effort: 替换为模型支持的等级，无法指定等级时移除
+	if v, ok := body["reasoning_effort"]; ok && v != nil {
+		if effort == "" {
+			delete(body, "reasoning_effort")
+		} else {
+			body["reasoning_effort"] = effort
+		}
+	}
 	out, err := json.Marshal(body)
 	if err != nil {
 		return rawBody
@@ -202,11 +215,12 @@ func prepareChatBody(rawBody []byte) []byte {
 }
 
 // ChatStream 发 chat 请求并返回原始 SSE body 流（调用方负责 Close）。
+// effort 为该模型支持的思考等级，用于改写 body 中的 reasoning_effort（空 = 移除该字段）。
 // 非 2xx 时 rc 为 nil、status 为上游状态码、err 为 nil（body 在 c.LastBody，
 // 调用方用 Classify(status, body) 判定）；只有传输层失败才返回 err。
-func (c *Client) ChatStream(a *auth.Auth, body []byte) (rc io.ReadCloser, status int, err error) {
+func (c *Client) ChatStream(a *auth.Auth, body []byte, effort string) (rc io.ReadCloser, status int, err error) {
 	url := ServerBase() + "/api/proxy/v1/chat/completions"
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(prepareChatBody(body)))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(prepareChatBody(body, effort)))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -226,6 +240,28 @@ func (c *Client) ChatStream(a *auth.Auth, body []byte) (rc io.ReadCloser, status
 		return nil, resp.StatusCode, nil
 	}
 	return resp.Body, resp.StatusCode, nil
+}
+
+// modelThinkingConfig 上游 available 接口中单个模型的思考等级配置。
+// options 按等级升序下发，最后一项即该模型支持的最高等级；整个字段为 null 表示该模型无法指定思考等级。
+type modelThinkingConfig struct {
+	Options []struct {
+		// OpenclawLevel 转发给上游时 reasoning_effort 可用的等级名（实测 off/high/xhigh）。
+		OpenclawLevel string `json:"openclawLevel"`
+	} `json:"options"`
+}
+
+// lastOpenclawLevel 取 options 最后一项的 openclawLevel；无配置或等级名全为空时返回空字符串。
+func (tc *modelThinkingConfig) lastOpenclawLevel() string {
+	if tc == nil {
+		return ""
+	}
+	for i := len(tc.Options) - 1; i >= 0; i-- {
+		if v := strings.TrimSpace(tc.Options[i].OpenclawLevel); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // FetchModels 调上游动态模型接口。
@@ -261,13 +297,14 @@ func (c *Client) FetchModels(a *auth.Auth) ([]ModelMeta, error) {
 	var env struct {
 		Code int `json:"code"`
 		Data []struct {
-			ModelID        string  `json:"modelId"`
-			ModelName      string  `json:"modelName"`
-			Provider       string  `json:"provider"`
-			ApiFormat      string  `json:"apiFormat"`
-			ContextWindow  int64   `json:"contextWindow"`
-			CostMultiplier float64 `json:"costMultiplier"`
-			Description    string  `json:"description"`
+			ModelID        string               `json:"modelId"`
+			ModelName      string               `json:"modelName"`
+			Provider       string               `json:"provider"`
+			ApiFormat      string               `json:"apiFormat"`
+			ContextWindow  int64                `json:"contextWindow"`
+			CostMultiplier float64              `json:"costMultiplier"`
+			Description    string               `json:"description"`
+			ThinkingConfig *modelThinkingConfig `json:"thinkingConfig"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &env); err != nil {
@@ -282,13 +319,14 @@ func (c *Client) FetchModels(a *auth.Auth) ([]ModelMeta, error) {
 			continue
 		}
 		out = append(out, ModelMeta{
-			ID:             m.ModelID,
-			Name:           m.ModelName,
-			Provider:       m.Provider,
-			ApiFormat:      m.ApiFormat,
-			ContextWindow:  m.ContextWindow,
-			CostMultiplier: m.CostMultiplier,
-			Description:    m.Description,
+			ID:              m.ModelID,
+			Name:            m.ModelName,
+			Provider:        m.Provider,
+			ApiFormat:       m.ApiFormat,
+			ContextWindow:   m.ContextWindow,
+			CostMultiplier:  m.CostMultiplier,
+			Description:     m.Description,
+			ReasoningEffort: m.ThinkingConfig.lastOpenclawLevel(),
 		})
 	}
 	if len(out) == 0 {
